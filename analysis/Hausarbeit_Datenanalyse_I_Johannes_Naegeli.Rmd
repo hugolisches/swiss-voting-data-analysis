@@ -1,0 +1,1075 @@
+---
+title: "Gemeindestrukturelle Unterschiede im Abstimmungsverhalten zur Initiative: Keine 10-Millionen-Schweiz! (Nachhaltigkeitsinitiative)"
+subtitle: "Hausarbeit im Kurs Datenanalyse I – Sommersemester 2026"
+author:
+  - "Johannes Nägeli (465728)"
+date: "18. September 2026"
+
+documentclass: article
+classoption:
+  - a4paper
+  - 12pt
+  - titlepage
+
+lang: de
+urlcolor: blue
+
+geometry:
+  - top=2.5cm
+  - bottom=2.5cm
+  - left=2.5cm
+  - right=2.0cm
+
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+    fig_caption: true
+    citation_package: natbib
+    extra_dependencies:
+      - booktabs
+      - longtable
+      
+
+bibliography: ../references/Bibliography.bib
+
+
+header-includes:
+  - \usepackage{setspace}
+  - \usepackage{caption}
+  - \onehalfspacing
+  - \usepackage{newtxtext,newtxmath}
+  - \widowpenalty=10000
+  - \clubpenalty=10000
+---
+
+```{r setup, include=FALSE}
+pakete = c("ggplot2", "readxl", "sf", "rmdwc")
+
+fehlend = pakete[!sapply(pakete, requireNamespace, quietly = TRUE)]
+
+if (length(fehlend) > 0) {
+  install.packages(fehlend, repos = "https://cloud.r-project.org")
+}
+
+knitr::opts_chunk$set(
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  fig.align = "center"
+)
+
+library(ggplot2)
+```
+
+```{r datenaufbereitung, include=FALSE}
+source(
+  "../src/datenaufbereitung.R",
+  local = knitr::knit_global()
+)
+```
+
+\vspace{4\baselineskip}
+
+**Zeichen ohne Leerzeichen:**
+
+```{r zeichenzahl, echo=FALSE, results='asis'}
+if (!requireNamespace("rmdwc", quietly = TRUE)) {
+  stop("Das Paket 'rmdwc' ist nicht installiert.")
+}
+
+zeichenzahl = rmdwc::rmdcount()$nonws
+
+cat(
+  format(
+    zeichenzahl,
+    big.mark = "'",
+    scientific = FALSE
+  )
+)
+```
+
+\newpage
+
+# Einführung
+
+## Politischer Hintergrund der Nachhaltigkeitsinitiative
+
+Am 14. Juni 2026 stimmten die Schweizer Stimmberechtigten über die eidgenössische Volksinitiative «Keine 10-Millionen-Schweiz! (Nachhaltigkeitsinitiative)» ab. Die Initiative wurde am 3. April 2024 eingereicht. Am 8. Mai 2024 stellte die Schweizerische Bundeskanzlei ihr Zustandekommen fest, nachdem die Mindestanforderung von 100'000 gültigen Unterschriften erreicht worden war \citep{schweizerische_bundeskanzlei_eidgenossische_2024}.
+
+Die Initiative verlangte eine Begrenzung der ständigen Wohnbevölkerung der Schweiz. Diese sollte vor dem Jahr 2050 die Schwelle von zehn Millionen Personen nicht überschreiten. Bei einer Überschreitung von 9,5 Millionen Personen hätten Bundesrat und Bundesversammlung Massnahmen ergreifen müssen, insbesondere im Asylbereich und beim Familiennachzug. Zudem sollten Ausnahme- oder Schutzklauseln in internationalen Abkommen ausgehandelt oder angerufen werden, sofern diese zum Bevölkerungswachstum beitragen. Bei einer Überschreitung der Zehn-Millionen-Grenze wären weitergehende Massnahmen vorgesehen gewesen. Dazu gehörte unter bestimmten Bedingungen auch die Kündigung des Personenfreizügigkeitsabkommens mit der Europäischen Union \citep{staatssekretariat_fur_migration_bundesbeschluss_2025}.
+
+Die Bundesversammlung empfahl Volk und Ständen, die Initiative abzulehnen. In der Abstimmung wurde sie mit einem Nein-Stimmenanteil von 54,79 Prozent verworfen \citep{bundesamt_fur_statistik_abstimmungsdashboard_2026}.
+
+## Öffentliche Debatte und Forschungsinteresse
+
+Mehrere Schweizer Medien beschrieben nach der Abstimmung einen deutlichen Stadt-Land-Graben. Demnach erhielt die Initiative in ländlichen Gemeinden mehr Zustimmung als in den Städten \citep{gerny_stadte_2026,goebel_10-millionen-resultat_2026}.
+
+Zudem wurde berichtet, dass hohe Ja-Anteile teilweise gerade in Gemeinden mit geringem Ausländeranteil und geringer Bevölkerungsdichte auftraten, also in Gemeinden, in denen es weniger räumliche Knappheit gibt \citep{marc_brupbacher_10-millionen-initiative_2026,campell_unteriberg_2026}. Einige Beiträge stützen sich dabei jedoch nur auf einzelne Gemeinden oder ausgewählte Beispiele.
+
+Ziel dieser Arbeit ist es deshalb, die beschriebenen Muster anhand der Daten aller Schweizer Gemeinden zu überprüfen.
+
+## Forschungsfrage und Teilfragen
+
+Die zentrale Forschungsfrage lautet:
+
+> In welchem Zusammenhang stehen der Ausländeranteil, der Siedlungsdruck und der Stadtstatus einer Schweizer Gemeinde mit ihrem Ja-Anteil zur Nachhaltigkeitsinitiative?
+
+Zur Beantwortung dieser Forschungsfrage werden drei Teilfragen untersucht:
+
+1. Welcher Zusammenhang besteht zwischen dem Ausländeranteil einer Gemeinde und ihrem Ja-Anteil?
+2. Welcher Zusammenhang besteht zwischen dem Siedlungsdruck einer Gemeinde und ihrem Ja-Anteil?
+3. Inwiefern unterscheidet sich der Ja-Anteil zwischen Städten und anderen Gemeinden?
+
+# Datengrundlage 
+
+## Abstimmungsdaten
+
+Das Bundesamt für Statistik veröffentlicht für eidgenössische Abstimmungen die absoluten Zahlen der eingegangenen Stimmen auf Kantons-, Bezirks- und Gemeindeebene. Für die vorliegende Analyse wurden die Daten auf die Nachhaltigkeitsinitiative beschränkt und ausschliesslich die Ergebnisse auf Gemeindeebene verwendet. Auf dieser Grundlage wurde für jede Gemeinde der prozentuale Ja-Anteil an den gültigen Stimmen berechnet \citep{bundesamt_fur_statistik_gemeindeergebnisse_2026}.
+
+## Bevölkerungsdaten
+
+Für die Berechnung des Ausländeranteils wurden die vom Bundesamt für Statistik veröffentlichten provisorischen Jahresergebnisse 2025 zur ständigen Wohnbevölkerung nach Staatsangehörigkeitskategorie und Gemeinde verwendet. Der Ausländeranteil wurde aus der Zahl der ausländischen Bevölkerung und der gesamten ständigen Wohnbevölkerung berechnet \citep{bundesamt_fur_statistik_standige_2026}.
+
+Da in der Ausgangsdatei Gemeinden ohne ausländische Wohnbevölkerung nicht mit dem Wert null ausgewiesen waren, wurden diese Fälle beim Einlesen zunächst als fehlende Werte erfasst. Sie wurden anschliessend manuell durch null ersetzt. 
+
+
+## Bauzonendaten
+
+Für die Analyse wurden die Bauzonendaten des Bundesamtes für Raumentwicklung aus dem Jahr 2022 verwendet. Der Datensatz basiert auf Angaben der kantonalen Fachstellen und zeigt die Bauzonenflächen der einzelnen Gemeinden in Hektaren \citep{bundesamt_fur_raumentwicklung_bauzonenstatistik_2022}.
+
+Die Bauzonenstatistik unterscheidet unter anderem zwischen Wohn-, Arbeits-, Misch- und Zentrumszonen sowie Zonen für öffentliche Nutzungen, Tourismus, Freizeit und Verkehr. Für die vorliegende Analyse wurde das Total der Bauzonenflächen verwendet, da Bevölkerungswachstum nicht nur zusätzlichen Wohnraum, sondern auch weitere Infrastruktur und Nutzungsflächen beansprucht.
+
+Daraus wurde der Siedlungsdruck als Verhältnis der ständigen Wohnbevölkerung zur gesamten Bauzonenfläche berechnet:
+
+\[
+\text{Siedlungsdruck}_i =
+\frac{\text{ständige Wohnbevölkerung}_i}
+{\text{gesamte Bauzonenfläche}_i}.
+\]
+
+Ein höherer Wert bedeutet, dass sich mehr Personen eine geringere Bauzonenfläche teilen.
+
+Leere Felder bei einzelnen Bauzonenkategorien wurden als null behandelt, weil eine leere Zelle in den Rohdaten offenbar bedeutet, dass diese Nutzungsart in der Gemeinde nicht vorkommt. Für die Berechnung des Siedlungsdrucks wurden jedoch direkt die Angaben zur gesamten Bauzonenfläche verwendet. Bei den Gemeinden, für die auch bei diesem aggregierten Wert keine Angabe vorhanden war, konnte der Siedlungsdruck nicht berechnet werden und wurde deshalb als fehlend behandelt.
+
+Für die Arbeit wurde bewusst die Bauzonenfläche und nicht die gesamte Gemeindefläche verwendet, da die Gesamtfläche insbesondere im alpinen Raum weniger Aufschluss über den verfügbaren Siedlungsraum gibt.
+
+## Klassifikation statistischer Städte
+
+Ob eine Gemeinde als statistische Stadt gilt, wurde anhand der Definition des Bundesamtes für Statistik bestimmt. Dazu wird die Summe aus Einwohnerzahl, Beschäftigtenzahl und der in Äquivalente umgerechneten Zahl der Logiernächte betrachtet. Diese Grösse wird als Einwohner-, Beschäftigten- und Logiernächteäquivalente (EBL) bezeichnet.
+
+Eine Gemeinde gilt als statistische Stadt, wenn ihre anhand eines Rasters von 300 × 300 Metern bestimmte Kernzone mindestens 12'000 EBL umfasst und die gesamte Gemeinde eine Grösse von mindestens 14'000 EBL erreicht \citep{bundesamt_fur_statistik_aktualisierung_2024}.
+
+Das Bundesamt für Statistik stellt zudem einen Datensatz bereit, in dem die Gemeinden direkt als statistische Stadt klassifiziert sind. Diese Einteilung wurde für die Erstellung der Stadtvariable übernommen \citep{bundesamt_fur_statistik_geometrien_2026}.
+
+## Datenaufbereitung und Harmonisierung der Gemeinden
+
+In der Schweiz kam es in den letzten Jahren zu mehreren Gemeindefusionen und Gemeindegründungen sowie zu einem Kantonswechsel. Da die Zielvariable aus dem Abstimmungsdatensatz stammt, wurden die übrigen Datensätze an dessen Gemeindestand angepasst. Bei Fusionen wurden die Werte der eingegliederten Gemeinde zu jenen der bestehenden Gemeinde addiert. Bei Neugründungen wurden die Werte aller beteiligten Gemeinden zusammengeführt. Beim Kantonswechsel wurde die Kantonsvariable aktualisiert \citep{bundesamt_fur_statistik_mutierte_2026}.
+
+## Deskriptive Verteilungen
+### Ja-Anteil
+
+\noindent
+\begin{minipage}[c]{0.52\textwidth}
+\vspace{0pt}
+\centering
+```{r ja-anteil-histogramm, echo=FALSE, fig.width=5, fig.height=3.5, out.width="100%"}
+x <- Analyse$Ja_Anteil
+
+statistik <- paste0(
+  "Min: ", round(min(x, na.rm = TRUE), 2), "\n",
+  "Max: ", round(max(x, na.rm = TRUE), 2), "\n",
+  "Median: ", round(median(x, na.rm = TRUE), 2), "\n",
+  "Mittelwert: ", round(mean(x, na.rm = TRUE), 2)
+)
+
+ggplot(Analyse, aes(x = Ja_Anteil)) +
+  geom_histogram(bins = 30, colour = "white") +
+  annotate(
+    "text",
+    x = Inf,
+    y = Inf,
+    label = statistik,
+    hjust = 1.1,
+    vjust = 1.2
+  ) +
+  labs(
+    x = "Ja-Anteil",
+    y = "Anzahl Gemeinden"
+  ) +
+  theme_minimal()
+```
+\captionsetup{font=scriptsize, justification=raggedright, singlelinecheck=false}
+\captionof{figure}[Histogramm des Ja-Anteils auf Gemeindeebene]
+{Histogramm des Ja-Anteils auf Gemeindeebene\\
+\textnormal{(Quelle: Eigene Darstellung).}}
+\label{fig:ja-anteil-histogramm}
+\end{minipage}\hfill
+\begin{minipage}[c]{0.43\textwidth}
+\vspace{0pt}
+
+Der Ja-Anteil reicht von 16,41 bis 90,54 Prozent. Die meisten Werte liegen um 50 Prozent. Da Median und Mittelwert nahe beieinanderliegen, ist die Verteilung weitgehend symmetrisch (vgl. Abb. 1). Zudem scheint sie unimodal zu sein. Fehlende Werte gibt es keine. Da es sich um realisierte Abstimmungsergebnisse handelt, wurden extreme Werte nicht als Ausreisser behandelt.
+
+\end{minipage}
+### Ausländeranteil
+
+\noindent
+\begin{minipage}[c]{0.52\textwidth}
+\centering
+
+```{r auslaenderanteil-histogramm, echo=FALSE, fig.width=5, fig.height=3.2, out.width="95%"}
+x <- Analyse$Auslaenderanteil
+
+statistik <- paste0(
+  "Min: ", round(min(x, na.rm = TRUE), 2), "\n",
+  "Max: ", round(max(x, na.rm = TRUE), 2), "\n",
+  "Median: ", round(median(x, na.rm = TRUE), 2), "\n",
+  "Mittelwert: ", round(mean(x, na.rm = TRUE), 2)
+)
+
+ggplot(Analyse, aes(x = Auslaenderanteil)) +
+  geom_histogram(bins = 30, colour = "white") +
+  annotate(
+    "text",
+    x = Inf,
+    y = Inf,
+    label = statistik,
+    hjust = 1.1,
+    vjust = 1.2
+  ) +
+  labs(
+    x = "Ausländeranteil",
+    y = "Anzahl Gemeinden"
+  ) +
+  theme_minimal()
+```
+
+\captionsetup{font=scriptsize, justification=raggedright, singlelinecheck=false}
+\captionof{figure}[Histogramm des Ausländeranteils auf Gemeindeebene]
+{Histogramm des Ausländeranteils auf Gemeindeebene\\
+\textnormal{(Quelle: Eigene Darstellung).}}
+\label{fig:auslaenderanteil-histogramm}
+\end{minipage}\hfill
+\begin{minipage}[c]{0.43\textwidth}
+
+Der prozentuale Ausländeranteil reicht von 0 bis 63,9 Prozent. Die Verteilung ist rechtsschief, wobei der Median unter dem Mittelwert liegt (vgl. Abb. 2). Fehlende Werte gibt es keine. Auch hier wurden extreme Werte nicht als Ausreisser behandelt.
+
+\end{minipage}
+
+### Siedlungsdruck
+
+\noindent
+\begin{minipage}[c]{0.52\textwidth}
+\centering
+
+```{r siedlungsdruck-boxplots, echo=FALSE, fig.width=5, fig.height=5.2, out.width="100%"}
+x <- Analyse$Siedlungsdruck
+
+statistik <- paste0(
+  "Min: ", round(min(x, na.rm = TRUE), 2), "\n",
+  "Max: ", round(max(x, na.rm = TRUE), 2), "\n",
+  "Median: ", round(median(x, na.rm = TRUE), 2), "\n",
+  "Mittelwert: ", round(mean(x, na.rm = TRUE), 2), "\n",
+  "Fehlend: ", sum(is.na(x))
+)
+
+# Zwei Boxplots untereinander
+par(
+  mfrow = c(2, 1),
+  mar = c(3, 1.5, 2, 0.5)
+)
+
+# Boxplot mit allen Werten
+boxplot(
+  x,
+  horizontal = TRUE,
+  main = "Mit allen Werten",
+  xlab = "Siedlungsdruck"
+)
+
+# Zusammenfassende Statistiken
+text(
+  x = max(x, na.rm = TRUE) * 0.98,
+  y = 1.32,
+  labels = statistik,
+  adj = c(1, 1),
+  cex = 0.7
+)
+
+# Boxplot ohne den extremsten Wert
+x_ohne_extremwert <- x[x != max(x, na.rm = TRUE)]
+
+boxplot(
+  x_ohne_extremwert,
+  horizontal = TRUE,
+  main = "Ohne extremsten Wert",
+  xlab = "Siedlungsdruck"
+)
+
+par(mfrow = c(1, 1))
+```
+
+\captionsetup{font=scriptsize, justification=raggedright, singlelinecheck=false}
+\captionof{figure}[Boxplots des Siedlungsdrucks mit und ohne den extremsten Wert]
+{Boxplots des Siedlungsdrucks mit und ohne den extremsten Wert 
+\textnormal{(Quelle: Eigene Darstellung).}}
+\label{fig:siedlungsdruck-boxplots}
+\end{minipage}\hfill
+\begin{minipage}[c]{0.43\textwidth}
+
+Der Siedlungsdruck weist einen extremen Wert von 804,67 auf. Dieser entsteht bei einer Gemeinde mit weniger als einer Hektare gesamter Bauzonenfläche. Dadurch wird der erste Boxplot stark zusammengedrückt. Im zweiten Boxplot wurde dieser Wert nur für die Darstellung ausgeblendet. Der Wert wurde für die Analyse nicht entfernt.
+
+Mit einem Median von 30,78 und einem Mittelwert von 33,03 ist die Verteilung leicht rechtsschief (vgl. Abb. 3). Zudem liegen acht fehlende Werte vor. Diese entstehen, weil für die betroffenen Gemeinden keine Bauzonenfläche ausgewiesen ist. Eine Berechnung des Siedlungsdrucks würde dadurch zu einer Division durch null und somit zu einem unendlichen Wert führen. Deshalb wurden diese Beobachtungen als fehlend gekennzeichnet. Bei den betroffenen Gemeinden handelt es sich um kleine Orte mit einer Bevölkerung von weniger als 150 Personen.
+
+\end{minipage}
+
+### Stadt
+
+\noindent
+\begin{minipage}[c]{0.52\textwidth}
+\centering
+
+```{r stadt-balkendiagramm, echo=FALSE, fig.width=5, fig.height=3.2, out.width="95%"}
+stadt_haeufigkeit <- table(Analyse$Stadt, useNA = "ifany")
+
+barplot_positionen <- barplot(
+  stadt_haeufigkeit,
+  names.arg = c("Keine Stadt", "Stadt"),
+  xlab = "Stadtstatus",
+  ylab = "Anzahl Gemeinden",
+  ylim = c(0, max(stadt_haeufigkeit) * 1.25)
+)
+
+text(
+  x = barplot_positionen,
+  y = stadt_haeufigkeit,
+  labels = stadt_haeufigkeit,
+  pos = 3,
+  offset = 0.4,
+  cex = 0.8,
+  xpd = TRUE
+)
+```
+
+
+\captionsetup{font=scriptsize, justification=raggedright, singlelinecheck=false}
+\captionof{figure}[Verteilung der Gemeinden nach Stadtstatus]
+{Verteilung der Gemeinden nach Stadtstatus\\
+\textnormal{(Quelle: Eigene Darstellung).}}
+\label{fig:stadt-balkendiagramm}
+\end{minipage}\hfill
+\begin{minipage}[c]{0.43\textwidth}
+
+Von den untersuchten Gemeinden sind 173 als \textit{Städte} und 1932 als \textit{keine Städte} klassifiziert. Damit ist die Kategorie \textit{keine Stadt} deutlich häufiger vertreten (vgl. Abb. 4). Fehlende Werte gibt es keine.
+
+\end{minipage}
+
+# Analyse
+
+## Ausländeranteil und Ja-Anteil
+
+Da es sich beim Ausländeranteil und beim Ja-Anteil um zwei metrische Variablen handelt, kann zur Untersuchung ihres bivariaten Zusammenhangs die Pearson-Korrelation verwendet werden. Da der Ausländeranteil rechtsschief verteilt ist, wird ergänzend die Spearman-Rangkorrelation als Robustheitsprüfung berechnet. Da die Daten die Grundgesamtheit der Gemeinden dieser Abstimmung abbilden, werden die Korrelationskoeffizienten deskriptiv interpretiert und keine Signifikanztests durchgeführt.
+
+```{r auslaender-korrelationen, echo=FALSE, include=FALSE}
+daten_auslaender = Analyse[
+  complete.cases(
+    Analyse[, c("Auslaenderanteil", "Ja_Anteil")]
+  ),
+]
+
+pearson_auslaender = cor(
+  daten_auslaender$Auslaenderanteil,
+  daten_auslaender$Ja_Anteil,
+  method = "pearson"
+)
+
+spearman_auslaender = cor(
+  daten_auslaender$Auslaenderanteil,
+  daten_auslaender$Ja_Anteil,
+  method = "spearman"
+)
+
+pa = format(
+  round(pearson_auslaender, 3),
+  decimal.mark = ",",
+  nsmall = 3
+)
+
+sa = format(
+  round(spearman_auslaender, 3),
+  decimal.mark = ",",
+  nsmall = 3
+)
+```
+
+Die Pearson-Korrelation beträgt
+\(r = `r pa`\),
+die Spearman-Rangkorrelation
+\(\rho = `r sa`\).
+
+Beide Korrelationskoeffizienten deuten auf einen mittleren negativen Zusammenhang hin. Gemeinden mit einem höheren Ausländeranteil wiesen tendenziell einen geringeren Ja-Anteil auf. Da beide Koeffizienten eine ähnliche Richtung und Grössenordnung aufweisen, ist das Ergebnis gegenüber der Wahl des Korrelationsmasses robust.
+
+## Siedlungsdruck und Ja-Anteil
+
+Beim Siedlungsdruck und beim Ja-Anteil handelt es sich um metrische Variablen. Zur Untersuchung ihres bivariaten Zusammenhangs werden daher die Pearson-Korrelation und aufgrund der leichten Rechtsschiefe des Siedlungsdrucks ergänzend die Spearman-Rangkorrelation berechnet. Da beim Siedlungsdruck acht fehlende Werte vorliegen, die nicht zufällig verteilt sind, sondern Gemeinden mit weniger als 150 Einwohnern betreffen und zudem ein starker Extremwert vorhanden ist (vgl. Abschnitt 2.6.3), werden drei Varianten verglichen.
+
+Da die Daten die Grundgesamtheit der Gemeinden dieser Abstimmung abbilden, werden die Korrelationskoeffizienten deskriptiv interpretiert und keine Signifikanztests durchgeführt.
+
+```{r siedlungsdruck-korrelationen, echo=FALSE, include=FALSE}
+# 1. Vollständige Fälle mit Extremwert
+daten_vollstaendig = Analyse[
+  complete.cases(
+    Analyse[, c("Siedlungsdruck", "Ja_Anteil")]
+  ),
+]
+
+pearson_vollstaendig = cor(
+  daten_vollstaendig$Siedlungsdruck,
+  daten_vollstaendig$Ja_Anteil,
+  method = "pearson"
+)
+
+spearman_vollstaendig = cor(
+  daten_vollstaendig$Siedlungsdruck,
+  daten_vollstaendig$Ja_Anteil,
+  method = "spearman"
+)
+
+# 2. Fehlende Werte durch den Median des Siedlungsdrucks
+# von Gemeinden mit weniger als 150 Einwohnern ersetzen
+median_kleine_gemeinden = median(
+  Analyse$Siedlungsdruck[
+    Analyse$Bevoelkerung < 150 &
+      !is.na(Analyse$Siedlungsdruck)
+  ],
+  na.rm = TRUE
+)
+
+daten_median = Analyse
+
+daten_median$Siedlungsdruck[
+  is.na(daten_median$Siedlungsdruck)
+] = median_kleine_gemeinden
+
+pearson_median = cor(
+  daten_median$Siedlungsdruck,
+  daten_median$Ja_Anteil,
+  use = "complete.obs",
+  method = "pearson"
+)
+
+spearman_median = cor(
+  daten_median$Siedlungsdruck,
+  daten_median$Ja_Anteil,
+  use = "complete.obs",
+  method = "spearman"
+)
+
+# 3. Vollständige Fälle ohne den Extremwert
+extremwert = max(
+  daten_vollstaendig$Siedlungsdruck,
+  na.rm = TRUE
+)
+
+daten_ohne_extremwert = daten_vollstaendig[
+  daten_vollstaendig$Siedlungsdruck != extremwert,
+]
+
+pearson_ohne_extremwert = cor(
+  daten_ohne_extremwert$Siedlungsdruck,
+  daten_ohne_extremwert$Ja_Anteil,
+  method = "pearson"
+)
+
+spearman_ohne_extremwert = cor(
+  daten_ohne_extremwert$Siedlungsdruck,
+  daten_ohne_extremwert$Ja_Anteil,
+  method = "spearman"
+)
+
+pv = format(
+  round(pearson_vollstaendig, 3),
+  decimal.mark = ",",
+  nsmall = 3
+)
+
+sv = format(
+  round(spearman_vollstaendig, 3),
+  decimal.mark = ",",
+  nsmall = 3
+)
+
+pm = format(
+  round(pearson_median, 3),
+  decimal.mark = ",",
+  nsmall = 3
+)
+
+sm = format(
+  round(spearman_median, 3),
+  decimal.mark = ",",
+  nsmall = 3
+)
+
+poe = format(
+  round(pearson_ohne_extremwert, 3),
+  decimal.mark = ",",
+  nsmall = 3
+)
+
+soe = format(
+  round(spearman_ohne_extremwert, 3),
+  decimal.mark = ",",
+  nsmall = 3
+)
+```
+
+- Vollständige Fälle mit dem Extremwert
+  - Pearson-Korrelation: \(r = `r pv`\)
+  - Spearman-Rangkorrelation: \(\rho = `r sv`\)
+
+- Ersetzung der fehlenden Werte durch den Median von Gemeinden mit weniger als 150 Einwohnern
+  - Pearson-Korrelation: \(r = `r pm`\)
+  - Spearman-Rangkorrelation: \(\rho = `r sm`\)
+
+- Vollständige Fälle ohne den Extremwert
+  - Pearson-Korrelation: \(r = `r poe`\)
+  - Spearman-Rangkorrelation: \(\rho = `r soe`\)
+  
+Die Korrelationskoeffizienten fallen in allen drei Varianten sehr schwach aus und liegen betragsmässig nahe bei null. Der Vorzeichenwechsel bei der Pearson-Korrelation zeigt zudem, dass Richtung und Stärke des Zusammenhangs vom Umgang mit dem Extremwert und den fehlenden Werten abhängen. Insgesamt ergibt sich daher kein aussagekräftiger bivariater Zusammenhang zwischen dem Siedlungsdruck und dem Ja-Anteil.
+
+## Stadt und Ja-Anteil
+
+Zur Untersuchung des Zusammenhangs zwischen dem Stadtstatus und dem Ja-Anteil werden die Mittelwerte verglichen. Ergänzend werden die Mediane betrachtet, um zu prüfen, ob der beobachtete Unterschied gegenüber einzelnen extremen Werten robust ist. Da die Daten die Grundgesamtheit der Gemeinden dieser Abstimmung abbilden, werden die beobachteten Unterschiede deskriptiv interpretiert und keine Signifikanztests durchgeführt.
+
+```{r stadt-ja-anteil, echo=FALSE, include=FALSE}
+mittelwert_nicht_stadt = mean(
+  Analyse$Ja_Anteil[Analyse$Stadt == "No"],
+  na.rm = TRUE
+)
+
+mittelwert_stadt = mean(
+  Analyse$Ja_Anteil[Analyse$Stadt == "Yes"],
+  na.rm = TRUE
+)
+
+median_nicht_stadt = median(
+  Analyse$Ja_Anteil[Analyse$Stadt == "No"],
+  na.rm = TRUE
+)
+
+median_stadt = median(
+  Analyse$Ja_Anteil[Analyse$Stadt == "Yes"],
+  na.rm = TRUE
+)
+
+mittelwertdifferenz = mittelwert_stadt - mittelwert_nicht_stadt
+
+mediandifferenz = median_stadt - median_nicht_stadt
+
+mns = format(
+  round(mittelwert_nicht_stadt, 2),
+  decimal.mark = ",",
+  nsmall = 2
+)
+
+mws = format(
+  round(mittelwert_stadt, 2),
+  decimal.mark = ",",
+  nsmall = 2
+)
+
+mdns = format(
+  round(median_nicht_stadt, 2),
+  decimal.mark = ",",
+  nsmall = 2
+)
+
+mds = format(
+  round(median_stadt, 2),
+  decimal.mark = ",",
+  nsmall = 2
+)
+
+mwd = format(
+  round(mittelwertdifferenz, 2),
+  decimal.mark = ",",
+  nsmall = 2
+)
+
+mdd = format(
+  round(mediandifferenz, 2),
+  decimal.mark = ",",
+  nsmall = 2
+)
+```
+
+Für die Nicht-Städte beträgt der durchschnittliche Ja-Anteil `r mns` Prozent und der Median `r mdns` Prozent. Für die Städte liegt der durchschnittliche Ja-Anteil bei `r mws` Prozent und der Median bei `r mds` Prozent. Als Differenz zwischen Städten und Nicht-Städten ergibt sich damit eine Mittelwertdifferenz von `r mwd` Prozentpunkten und eine Mediandifferenz von `r mdd` Prozentpunkten.
+
+Der Ja-Anteil liegt in Städten deutlich tiefer als in Nicht-Städten. Die ähnlichen Mittelwert- und Mediandifferenzen zeigen, dass dieses Ergebnis gegenüber der Wahl des Lagemasses robust ist.
+
+## Multiple lineare Regression
+
+Die bisherigen Analysen untersuchten die Variablen jeweils bivariat. Mithilfe der multiplen linearen Regression wird nun geprüft, ob die Zusammenhänge bestehen bleiben, wenn die Variablen gemeinsam betrachtet werden. Ziel ist es, die Zusammenhänge unter Kontrolle der übrigen Variablen zu untersuchen, ohne daraus kausale Aussagen abzuleiten.
+
+### Regressionsmodelle
+
+Zunächst wird ein Modell ohne Kantonskontrolle geschätzt. Danach wird der Kanton ergänzt, um regionale Unterschiede wie Sprachregion und kantonale Besonderheiten zu berücksichtigen. Zuerst werden nur Gemeinden mit vollständigen Angaben für die Regression verwendet. Der Einfluss der fehlenden Werte und des Extremwerts wird später untersucht.
+
+#### Modell ohne Kantonskontrolle
+\leavevmode
+Dieses Modell berücksichtigt den Ausländeranteil, den Siedlungsdruck und den Stadtstatus als erklärende Variablen.
+
+\[
+\text{Ja-Anteil}_i =
+\beta_0
++ \beta_1 \text{Ausländeranteil}_i
++ \beta_2 \text{Siedlungsdruck}_i
++ \beta_3 \text{Stadt}_i
++ \varepsilon_i
+\]
+
+```{r regression-ohne-kanton, echo=FALSE, include=FALSE}
+modell_ohne_kanton = lm(
+  Ja_Anteil ~ Auslaenderanteil + Siedlungsdruck + Stadt,
+  data = Analyse
+)
+
+koeff_auslaender_ohne_kanton = coef(modell_ohne_kanton)[
+  "Auslaenderanteil"
+]
+
+koeff_siedlungsdruck_ohne_kanton = coef(modell_ohne_kanton)[
+  "Siedlungsdruck"
+]
+
+koeff_stadt_ohne_kanton = coef(modell_ohne_kanton)[
+  "StadtYes"
+]
+
+kaok = format(
+  round(koeff_auslaender_ohne_kanton, 3),
+  decimal.mark = ",",
+  nsmall = 3
+)
+
+ksok = format(
+  round(koeff_siedlungsdruck_ohne_kanton, 3),
+  decimal.mark = ",",
+  nsmall = 3
+)
+
+kstok = format(
+  round(koeff_stadt_ohne_kanton, 3),
+  decimal.mark = ",",
+  nsmall = 3
+)
+```
+
+Für den Ausländeranteil ergibt sich ein Koeffizient von `r kaok`. Ein höherer Ausländeranteil geht damit unter Konstanthaltung der übrigen Variablen mit einem niedrigeren Ja-Anteil einher. Für den Siedlungsdruck beträgt der Koeffizient `r ksok`, womit ein höherer Siedlungsdruck mit einem leicht höheren Ja-Anteil verbunden ist. Für Städte ergibt sich gegenüber Nicht-Städten ein Koeffizient von `r kstok` Prozentpunkten. Städte weisen somit bei gleichem Ausländeranteil und Siedlungsdruck einen niedrigeren Ja-Anteil auf.
+
+#### Hauptmodell mit Kantonskontrolle
+\leavevmode
+In diesem Modell wird zusätzlich die Kantonszugehörigkeit berücksichtigt.
+
+\[
+\text{Ja-Anteil}_i =
+\beta_0
++ \beta_1 \text{Ausländeranteil}_i
++ \beta_2 \text{Siedlungsdruck}_i
++ \beta_3 \text{Stadt}_i
++ \gamma_{\text{Kanton}}
++ \varepsilon_i
+\]
+
+```{r regression-mit-kanton, echo=FALSE, include=FALSE}
+modell_mit_kanton = lm(
+  Ja_Anteil ~ Auslaenderanteil + Siedlungsdruck + Stadt + Kanton,
+  data = Analyse
+)
+
+koeff_auslaender_mit_kanton = coef(modell_mit_kanton)[
+  "Auslaenderanteil"
+]
+
+koeff_siedlungsdruck_mit_kanton = coef(modell_mit_kanton)[
+  "Siedlungsdruck"
+]
+
+koeff_stadt_mit_kanton = coef(modell_mit_kanton)[
+  "StadtYes"
+]
+
+kamk = format(
+  round(koeff_auslaender_mit_kanton, 3),
+  decimal.mark = ",",
+  nsmall = 3
+)
+
+ksmk = format(
+  round(koeff_siedlungsdruck_mit_kanton, 3),
+  decimal.mark = ",",
+  nsmall = 3
+)
+
+kstm = format(
+  abs(round(koeff_stadt_mit_kanton, 3)),
+  decimal.mark = ",",
+  nsmall = 3
+)
+```
+
+Unter Berücksichtigung der Kantonszugehörigkeit bleibt der Zusammenhang des Ausländeranteils negativ (`r kamk`). Der Koeffizient des Siedlungsdrucks liegt bei (`r ksmk`). Städte weisen innerhalb desselben Kantons einen um `r kstm` Prozentpunkte niedrigeren Ja-Anteil auf.
+
+### Robustheitsprüfungen
+
+Als Nächstes wird geprüft, wie sich die Ergebnisse verändern, wenn die fehlenden Werte durch den Median von Gemeinden mit weniger als 150 Einwohnern ersetzt werden und der extreme Wert des Siedlungsdrucks ausgeschlossen wird. Dafür werden die Daten entsprechend angepasst und jeweils das vollständige Modell mit Kantonskontrolle geschätzt.
+
+#### Ersetzung der fehlenden Siedlungsdruckwerte
+\leavevmode
+```{r regression-medianersetzung, echo=FALSE, include=FALSE}
+median_kleine_gemeinden = median(
+  Analyse$Siedlungsdruck[
+    Analyse$Bevoelkerung < 150 &
+      !is.na(Analyse$Siedlungsdruck)
+  ],
+  na.rm = TRUE
+)
+
+daten_median = Analyse
+
+daten_median$Siedlungsdruck[
+  is.na(daten_median$Siedlungsdruck)
+] = median_kleine_gemeinden
+
+modell_median = lm(
+  Ja_Anteil ~ Auslaenderanteil + Siedlungsdruck + Stadt + Kanton,
+  data = daten_median
+)
+
+koeff_auslaender_median = coef(modell_median)["Auslaenderanteil"]
+koeff_siedlungsdruck_median = coef(modell_median)["Siedlungsdruck"]
+koeff_stadt_median = coef(modell_median)["StadtYes"]
+
+kam = format(
+  round(koeff_auslaender_median, 3),
+  decimal.mark = ",",
+  nsmall = 3
+)
+
+ksm = format(
+  round(koeff_siedlungsdruck_median, 3),
+  decimal.mark = ",",
+  nsmall = 3
+)
+
+kstm = format(
+  round(koeff_stadt_median, 3),
+  decimal.mark = ",",
+  nsmall = 3
+)
+```
+
+Die fehlenden Siedlungsdruckwerte werden durch den Median der Gemeinden mit weniger als 150 Einwohnern ersetzt.
+
+Für den Ausländeranteil ergibt sich ein Koeffizient von `r kam`. Der Koeffizient des Siedlungsdrucks beträgt `r ksm`. Für Städte ergibt sich gegenüber Nicht-Städten ein Koeffizient von `r kstm` Prozentpunkten.
+
+#### Ausschluss des extremen Siedlungsdruckwerts bei vollständigen Fällen
+\leavevmode
+```{r regression-ohne-extremwert, echo=FALSE, include=FALSE}
+daten_ohne_extremwert = Analyse[
+  complete.cases(
+    Analyse[, c(
+      "Ja_Anteil",
+      "Auslaenderanteil",
+      "Siedlungsdruck",
+      "Stadt",
+      "Kanton"
+    )]
+  ),
+]
+
+extremwert = max(
+  daten_ohne_extremwert$Siedlungsdruck,
+  na.rm = TRUE
+)
+
+daten_ohne_extremwert = daten_ohne_extremwert[
+  daten_ohne_extremwert$Siedlungsdruck != extremwert,
+]
+
+modell_ohne_extremwert = lm(
+  Ja_Anteil ~ Auslaenderanteil + Siedlungsdruck + Stadt + Kanton,
+  data = daten_ohne_extremwert
+)
+
+koeff_auslaender_ohne_extremwert = coef(
+  modell_ohne_extremwert
+)["Auslaenderanteil"]
+
+koeff_siedlungsdruck_ohne_extremwert = coef(
+  modell_ohne_extremwert
+)["Siedlungsdruck"]
+
+koeff_stadt_ohne_extremwert = coef(
+  modell_ohne_extremwert
+)["StadtYes"]
+
+kaoe = format(
+  round(koeff_auslaender_ohne_extremwert, 3),
+  decimal.mark = ",",
+  nsmall = 3
+)
+
+ksoe = format(
+  round(koeff_siedlungsdruck_ohne_extremwert, 3),
+  decimal.mark = ",",
+  nsmall = 3
+)
+
+kstoe = format(
+  round(koeff_stadt_ohne_extremwert, 3),
+  decimal.mark = ",",
+  nsmall = 3
+)
+```
+
+Die fehlenden Siedlungsdruckwerte bleiben unberücksichtigt. Zusätzlich wird die Gemeinde mit dem extremen Siedlungsdruckwert aus der Analyse ausgeschlossen.
+
+Für den Ausländeranteil ergibt sich ein Koeffizient von `r kaoe`. Der Koeffizient des Siedlungsdrucks beträgt `r ksoe`. Für Städte ergibt sich gegenüber Nicht-Städten ein Koeffizient von `r kstoe` Prozentpunkten.
+
+### Modelldiagnostik
+
+Zur Überprüfung des Hauptmodells werden die Residuen sowie der Einfluss einzelner Beobachtungen grafisch untersucht.
+
+\noindent
+\begin{minipage}[c]{0.52\textwidth}
+\vspace{0pt}
+\centering
+
+```{r diagnostik-residuen-fitted, echo=FALSE, fig.width=5, fig.height=3.5, out.width="100%"}
+plot(
+  modell_mit_kanton,
+  which = 1,
+  sub.caption = "",
+  caption = "",
+  cex.lab = 0.9,
+  cex.axis = 0.8
+)
+```
+
+\captionsetup{font=scriptsize, justification=raggedright, singlelinecheck=false}
+\captionof{figure}[Residuen und vorhergesagte Werte]
+{Residuen und vorhergesagte Werte\\
+\textnormal{(Quelle: Eigene Darstellung).}}
+\label{fig:diagnostik-residuen-fitted}
+
+\end{minipage}\hfill
+\begin{minipage}[c]{0.43\textwidth}
+\vspace{0pt}
+
+Die Residuen streuen weitgehend zufällig um die Nulllinie. Die rote Linie verläuft nahezu horizontal, sodass keine deutliche Abweichung von der linearen Modellform erkennbar ist (vgl. Abb. 5).
+
+\end{minipage}
+
+\vspace{0.01cm}
+
+\noindent
+\begin{minipage}[c]{0.52\textwidth}
+\vspace{0pt}
+\centering
+
+```{r diagnostik-qq-plot, echo=FALSE, fig.width=5, fig.height=3.5, out.width="100%"}
+plot(
+  modell_mit_kanton,
+  which = 2,
+  sub.caption = "",
+  caption = "",
+  cex.lab = 0.9,
+  cex.axis = 0.8
+)
+```
+
+\captionsetup{font=scriptsize, justification=raggedright, singlelinecheck=false}
+\captionof{figure}[Quantil-Quantil-Diagramm der standardisierten Residuen]
+{Quantil-Quantil-Diagramm der standardisierten Residuen\\
+\textnormal{(Quelle: Eigene Darstellung).}}
+\label{fig:diagnostik-qq-plot}
+
+\end{minipage}\hfill
+\begin{minipage}[c]{0.43\textwidth}
+\vspace{0pt}
+
+Die standardisierten Residuen liegen grösstenteils nahe an der Referenzlinie. Nur an den Rändern zeigen sich leichte Abweichungen, insgesamt erscheint die Verteilung annähernd normal (vgl. Abb. 6).
+
+\end{minipage}
+
+\vspace{0.01cm}
+
+\noindent
+\begin{minipage}[c]{0.52\textwidth}
+\vspace{0pt}
+\centering
+
+```{r diagnostik-leverage, echo=FALSE, fig.width=5, fig.height=3.5, out.width="100%"}
+plot(
+  modell_mit_kanton,
+  which = 5,
+  sub.caption = "",
+  caption = "",
+  cex.lab = 0.9,
+  cex.axis = 0.8
+)
+```
+
+\captionsetup{font=scriptsize, justification=raggedright, singlelinecheck=false}
+\captionof{figure}[Residuen, Leverage und Cook-Distanzen]
+{Residuen, Leverage und Cook-Distanzen\\
+\textnormal{(Quelle: Eigene Darstellung).}}
+\label{fig:diagnostik-leverage}
+
+\end{minipage}\hfill
+\begin{minipage}[c]{0.43\textwidth}
+\vspace{0pt}
+
+Insgesamt zeigen sich keine starken Auffälligkeiten. Beobachtung 482 ist der bereits diskutierte Extremwert beim Siedlungsdruck und weist eine hohe Leverage auf. Die Cook-Distanz zeigt ansonsten keine starken Einflüsse auf das Modell (vgl. Abb. 7).
+
+\end{minipage}
+
+### Vergleich der Regressionsmodelle
+
+Die Modelle werden anhand der Richtung und Grösse der Koeffizienten sowie des adjustierten Bestimmtheitsmasses verglichen.
+
+```{r regressionsmodelle-vergleich, echo=FALSE}
+vergleich_regressionen = data.frame(
+  Variable = c(
+    "Ausländeranteil",
+    "Siedlungsdruck",
+    "Stadt",
+    "Adj. R²"
+  ),
+  `Ohne Kantonskontrolle` = c(
+    coef(modell_ohne_kanton)["Auslaenderanteil"],
+    coef(modell_ohne_kanton)["Siedlungsdruck"],
+    coef(modell_ohne_kanton)["StadtYes"],
+    summary(modell_ohne_kanton)$adj.r.squared
+  ),
+  `Mit Kantonskontrolle` = c(
+    coef(modell_mit_kanton)["Auslaenderanteil"],
+    coef(modell_mit_kanton)["Siedlungsdruck"],
+    coef(modell_mit_kanton)["StadtYes"],
+    summary(modell_mit_kanton)$adj.r.squared
+  ),
+  `Ersetzung fehlender Werte` = c(
+    coef(modell_median)["Auslaenderanteil"],
+    coef(modell_median)["Siedlungsdruck"],
+    coef(modell_median)["StadtYes"],
+    summary(modell_median)$adj.r.squared
+  ),
+  `Ohne Extremwert` = c(
+    coef(modell_ohne_extremwert)["Auslaenderanteil"],
+    coef(modell_ohne_extremwert)["Siedlungsdruck"],
+    coef(modell_ohne_extremwert)["StadtYes"],
+    summary(modell_ohne_extremwert)$adj.r.squared
+  ),
+  check.names = FALSE
+)
+
+vergleich_regressionen[, -1] = lapply(
+  vergleich_regressionen[, -1],
+  function(x) {
+    format(
+      round(x, 3),
+      decimal.mark = ",",
+      nsmall = 3
+    )
+  }
+)
+
+fmt3 = function(x) {
+  format(
+    round(x, 3),
+    decimal.mark = ",",
+    nsmall = 3
+  )
+}
+
+a_ok = fmt3(coef(modell_ohne_kanton)["Auslaenderanteil"])
+a_mk = fmt3(coef(modell_mit_kanton)["Auslaenderanteil"])
+
+s_mk = fmt3(coef(modell_mit_kanton)["Siedlungsdruck"])
+s_med = fmt3(coef(modell_median)["Siedlungsdruck"])
+s_oe = fmt3(coef(modell_ohne_extremwert)["Siedlungsdruck"])
+
+st_ok = fmt3(coef(modell_ohne_kanton)["StadtYes"])
+st_mk = fmt3(coef(modell_mit_kanton)["StadtYes"])
+
+st_mk_rund = format(
+  round(abs(coef(modell_mit_kanton)["StadtYes"]), 1),
+  decimal.mark = ",",
+  nsmall = 1
+)
+
+r2_ok = fmt3(summary(modell_ohne_kanton)$adj.r.squared)
+r2_mk = fmt3(summary(modell_mit_kanton)$adj.r.squared)
+r2_med = fmt3(summary(modell_median)$adj.r.squared)
+r2_oe = fmt3(summary(modell_ohne_extremwert)$adj.r.squared)
+
+knitr::kable(
+  vergleich_regressionen,
+  caption = "Vergleich der Regressionskoeffizienten und des adjustierten Bestimmtheitsmasses",
+  align = c("l", "c", "c", "c", "c"),
+  row.names = FALSE
+)
+```
+
+Beim Ausländeranteil wird der negative Koeffizient durch die Kantonskontrolle kleiner: Er sinkt von `r a_ok` auf `r a_mk`. Gemeinden mit einem höheren Ausländeranteil weisen somit auch unter Berücksichtigung der übrigen Variablen einen tieferen Ja-Anteil auf. In den Robustheitsprüfungen bleibt dieser Koeffizient nahezu unverändert. Dies ist wenig überraschend, da die fehlenden Werte und der Extremwert den Siedlungsdruck betreffen.
+
+Auch der positive Koeffizient des Siedlungsdrucks wird durch die Kantonskontrolle kleiner. Die Ersetzung der fehlenden Werte verändert ihn nur geringfügig von `r s_mk` auf `r s_med`. Nach dem Ausschluss des Extremwerts sinkt er dagegen auf `r s_oe`. Ein zusätzlicher Einwohner pro Hektare Bauzone geht damit lediglich mit einem um `r s_oe` Prozentpunkte höheren Ja-Anteil einher. Der Zusammenhang ist somit positiv, aber sehr schwach.
+
+Beim Stadtstatus nimmt der negative Koeffizient durch die Kantonskontrolle von `r st_ok` auf `r st_mk` Prozentpunkte zu. Die Robustheitsprüfungen verändern diesen Wert kaum. Innerhalb desselben Kantons und bei gleichem Ausländeranteil und Siedlungsdruck weisen Städte damit einen rund `r st_mk_rund` Prozentpunkte tieferen Ja-Anteil auf als Nicht-Städte.
+
+Das adjustierte Bestimmtheitsmass steigt durch die Kantonskontrolle deutlich von `r r2_ok` auf `r r2_mk`. Die Robustheitsmodelle erreichen mit `r r2_med` beziehungsweise `r r2_oe` nahezu identische Werte. Das Modell mit Kantonskontrolle beschreibt die Unterschiede im Ja-Anteil somit deutlich besser, und seine Ergebnisse erweisen sich gegenüber dem Umgang mit den fehlenden Werten und dem Extremwert als robust.
+
+# Fazit
+
+Bezogen auf den Ausländeranteil zeigt die Analyse einen deutlichen negativen Zusammenhang mit dem Ja-Anteil. Dieser war sowohl in der bivariaten Analyse als auch in den Regressionsmodellen sichtbar. Gemeinden mit einem höheren Ausländeranteil wiesen demnach tendenziell einen tieferen Ja-Anteil auf. Für eine weiterführende Untersuchung wäre es interessant, theoretische Erklärungsansätze für diesen Zusammenhang einzubeziehen.
+
+Beim Siedlungsdruck ist die Einordnung deutlich weniger eindeutig. In der bivariaten Analyse lagen die Korrelationskoeffizienten nahe bei null, wobei Pearson- und Spearman-Korrelation teilweise unterschiedliche Vorzeichen aufwiesen. Auch in den Regressionsmodellen blieb der Zusammenhang sehr schwach und wurde durch den extremen Wert beeinflusst. Insgesamt fällt die Bedeutung des Siedlungsdrucks damit geringer aus, als es die untersuchten Medienartikel vermuten liessen. Eine mögliche Erweiterung wäre, den räumlichen Druck mit einer anderen Kennzahl zu messen, etwa unter Einbezug der gesamten Gemeindefläche oder weiterer Merkmale. Zudem bildet die verwendete Kennzahl nicht zwingend ab, wie stark Wachstumsdruck oder räumliche Knappheit von der Bevölkerung subjektiv wahrgenommen werden.
+
+Der Unterschied zwischen Städten und Nicht-Städten war dagegen sowohl in der bivariaten Analyse als auch in den Regressionsmodellen deutlich erkennbar. Städte wiesen einen klar tieferen Ja-Anteil auf als Nicht-Städte. Dieser Unterschied blieb auch unter Berücksichtigung des Ausländeranteils, des Siedlungsdrucks und der Kantonszugehörigkeit bestehen. Auch hier wäre es sinnvoll, theoretische Ansätze und zusätzliche Merkmale einzubeziehen, um den beobachteten Unterschied genauer zu erklären.
+
+Abschliessend gilt es zu erwähnen, dass die Analyse deskriptiver Natur ist. Die Ergebnisse zeigen statistische Zusammenhänge auf Gemeindeebene, erlauben jedoch keine kausale Interpretation und keine Aussagen über das Abstimmungsverhalten einzelner Personen. Da alle Gemeinden gleich gewichtet werden, beziehen sich die Ergebnisse auf Unterschiede zwischen Gemeinden und nicht auf das durchschnittliche Abstimmungsverhalten der Schweizer Bevölkerung. Zudem stammen die verwendeten Datensätze aus unterschiedlichen Bezugsjahren, wodurch die Variablen die Situation zum Zeitpunkt der Abstimmung möglicherweise nicht vollständig abbilden. Eine weiterführende Untersuchung könnte diese Einschränkungen durch zusätzliche Variablen, theoretische Erklärungsansätze und alternative Messungen genauer berücksichtigen.
+\newpage
+
+
+**Eigenständigkeitserklärung**
+
+Hiermit erkläre ich, Johannes Nägeli, dass ich die vorliegende Arbeit noch
+nicht für andere Prüfungen eingereicht habe. Ich habe die Arbeit selbständig verfasst. Sämtliche Quellen einschließlich Internetquellen, die ich unverändert oder
+abgewandelt wiedergegeben habe, insbesondere Quellen für Texte, Grafiken, Tabellen und Bilder, habe ich als solche kenntlich gemacht.
+Ich bin mir darüber bewusst, dass bei Verstößen gegen diese Grundsätze ein Verfahren wegen Täuschungsversuchs bzw. Täuschung eingeleitet wird.
+
+\vspace{2cm}
+
+Berlin, 18. September, Signatur
+
+
+**Auskunft zum KI-Einsatz**
+
+Verwendetes KI-System: ChatGPT Modell GPT-5.6 
+
+- Erklärungen zu statistischen Methoden
+- Sprachliche Korrektur und Überarbeitung von Textpassagen
+- Überarbeitung und effizientere Gestaltung des R-Codes sowie der Kommentare
+- Unterstützung bei der Fehlersuche und beim Debugging des R-Codes
+- Unterstützung bei der Gestaltung und Programmierung des Layouts der R-Markdown-Datei
+\newpage
+
+
+\listoffigures
+
+\listoftables
+
+\newpage
